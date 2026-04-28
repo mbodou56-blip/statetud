@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StatEtud Expert – Santé Étudiante | UY1</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  :root {
+    --primary:   #1E3A5F;
+    --accent:    #3A6EBF;
+    --light:     #7CA9E0;
+    --pale:      #EFF6FF;
+    --success:   #0F766E;
+    --danger:    #B91C1C;
+    --warn:      #B45309;
+    --noir:      #1E293B;
+    --blanc:     #F8FAFC;
+    --gris:      #EEF2F7;
+    --gris2:     #CBD5E1;
+    --muted:     #64748B;
+    --ombre:     0 4px 20px rgba(30,41,59,0.09);
+    --radius:    14px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Nunito', sans-serif; background: var(--blanc); color: var(--noir); min-height: 100vh; }
+
+  .top-bar { height: 5px; background: linear-gradient(to right, #1E3A5F, #3A6EBF, #7CA9E0, #3A6EBF, #1E3A5F); }
+
+  header {
+    background: var(--primary);
+    color: white;
+    position: relative;
+    overflow: hidden;
+  }
+  .header-inner {
+    padding: 32px 48px 28px;
+    display: flex; align-items: center; gap: 20px;
+    position: relative; z-index: 2;
+  }
+  .header-bg {
+    position: absolute; top: -60px; right: -60px;
+    width: 300px; height: 300px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,169,224,0.15) 0%, transparent 70%);
+    z-index: 1;
+  }
+  .logo {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: linear-gradient(135deg, #3A6EBF, #7CA9E0);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; flex-shrink: 0;
+    box-shadow: 0 0 0 3px rgba(124,169,224,0.4);
+  }
+  .header-text h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; }
+  .header-text h1 span { color: #7CA9E0; }
+  .header-text p { color: rgba(255,255,255,0.6); font-size: 0.88rem; margin-top: 3px; }
+  .live-badge {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 8px 16px; border-radius: 100px;
+    font-size: 0.82rem; font-weight: 700; color: white;
+    white-space: nowrap;
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #22C55E;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+
+  nav {
+    background: white;
+    border-bottom: 1px solid #E2E8F0;
+    padding: 0 48px;
+    display: flex;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    overflow-x: auto;
+  }
+  .tab-btn {
+    padding: 16px 24px;
+    border: none; background: none;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.9rem; font-weight: 700;
+    color: var(--muted); cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 7px;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--accent); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  main { padding: 36px 48px; max-width: 1280px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .section-header { margin-bottom: 28px; }
+  .section-header h2 { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; }
+  .section-header h2 .acc { color: var(--accent); }
+  .section-header p { color: var(--muted); margin-top: 5px; font-size: 0.9rem; }
+
+  /* ── Formulaire ── */
+  .card {
+    background: white;
+    border-radius: var(--radius);
+    padding: 28px;
+    box-shadow: var(--ombre);
+    margin-bottom: 24px;
+  }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-weight: 800; font-size: 0.78rem; color: var(--noir); text-transform: uppercase; letter-spacing: 0.4px; }
+  label .req { color: var(--danger); }
+  input, select {
+    padding: 11px 14px; border: 2px solid #E2E8F0;
+    border-radius: var(--radius-sm);
+    font-family: 'Nunito', sans-serif; font-size: 0.95rem;
+    color: var(--noir); background: white; outline: none; transition: border-color .2s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input.err { border-color: var(--danger); }
+
+  .stress-val { text-align: center; font-size: 1.5rem; font-weight: 800; color: var(--accent); margin-bottom: 5px; }
+  .stress-slider {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 7px;
+    border-radius: 4px; outline: none; border: none; padding: 0; cursor: pointer;
+    background: linear-gradient(to right, #7CA9E0, #3A6EBF, #1E3A5F);
+  }
+  .stress-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: white; border: 3px solid var(--accent); cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  .stress-labels { display: flex; justify-content: space-between; margin-top: 5px; font-size: 0.72rem; color: var(--muted); }
+
+  .btn-submit {
+    grid-column: 1 / -1;
+    padding: 15px; background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: white; border: none; border-radius: var(--radius-sm);
+    font-family: 'Nunito', sans-serif; font-size: 1rem; font-weight: 800;
+    cursor: pointer; transition: all .25s;
+    box-shadow: 0 4px 14px rgba(58,110,191,0.3);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(58,110,191,0.4); }
+  .btn-submit:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+  /* ── KPI cards ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+  .kpi {
+    background: white; border-radius: var(--radius); padding: 20px 18px;
+    box-shadow: var(--ombre); border-top: 4px solid var(--accent);
+    transition: transform .2s;
+  }
+  .kpi:hover { transform: translateY(-2px); }
+  .kpi:nth-child(2) { border-top-color: #5A8FD6; }
+  .kpi:nth-child(3) { border-top-color: #7CA9E0; }
+  .kpi:nth-child(4) { border-top-color: #2A5298; }
+  .kpi .ico { font-size: 1.7rem; margin-bottom: 6px; }
+  .kpi .val { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; line-height: 1; }
+  .kpi .lbl { font-size: 0.75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-top: 3px; }
+
+  /* ── Charts grid ── */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .chart-card { background: white; border-radius: var(--radius); padding: 24px; box-shadow: var(--ombre); }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-card h3 { font-family: 'Playfair Display', serif; font-size: 1rem; margin-bottom: 14px; color: var(--noir); }
+  .chart-card canvas { max-height: 250px; }
+
+  /* ── Stats table ── */
+  .stats-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .stats-table th {
+    background: var(--gris); padding: 9px 12px;
+    text-align: left; font-size: 0.72rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .4px; color: var(--muted);
+  }
+  .stats-table th:first-child { border-radius: 7px 0 0 7px; }
+  .stats-table th:last-child { border-radius: 0 7px 7px 0; }
+  .stats-table td { padding: 10px 12px; border-bottom: 1px solid var(--gris); font-weight: 600; }
+  .stats-table tr:last-child td { border-bottom: none; }
+  .stats-table tr:hover td { background: #F1F5F9; }
+  .var-name { font-weight: 800; color: var(--accent); }
+  .hl { color: var(--primary); font-weight: 800; }
+
+  /* ── Corrélations ── */
+  .corr-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+  .corr-card {
+    border-radius: var(--radius-sm); padding: 14px 16px;
+    border: 1.5px solid; text-align: center;
+  }
+  .corr-card .corr-val { font-size: 1.6rem; font-weight: 900; font-family: 'Playfair Display', serif; }
+  .corr-card .corr-lbl { font-size: 0.75rem; color: var(--muted); margin-top: 3px; }
+  .corr-card .corr-interp { font-size: 0.72rem; font-weight: 700; margin-top: 4px; }
+  .c-strong-pos { background: #EFF6FF; border-color: #3A6EBF; color: #1E3A5F; }
+  .c-mod-pos    { background: #F0FDF4; border-color: #22C55E; color: #14532D; }
+  .c-weak       { background: #F8FAFC; border-color: #CBD5E1; color: #475569; }
+  .c-neg        { background: #FEF2F2; border-color: #F87171; color: #7F1D1D; }
+
+  /* ── Tests stat ── */
+  .tests-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .test-card { background: white; border-radius: var(--radius); padding: 24px; box-shadow: var(--ombre); }
+  .test-card h3 { font-family: 'Playfair Display', serif; font-size: 1rem; margin-bottom: 14px; }
+  .test-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--gris); font-size: 0.88rem; }
+  .test-row:last-child { border-bottom: none; }
+  .test-key { color: var(--muted); font-weight: 600; }
+  .test-val { font-weight: 800; color: var(--primary); }
+  .verdict {
+    margin-top: 12px; padding: 8px 14px;
+    border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 700;
+  }
+  .verdict.sig { background: #ECFDF5; color: #065F46; }
+  .verdict.nosig { background: #FEF9C3; color: #713F12; }
+
+  /* ── Export buttons ── */
+  .export-bar {
+    display: flex; gap: 12px; margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .btn-export {
+    padding: 11px 22px; border: 2px solid var(--accent);
+    color: var(--accent); background: white;
+    border-radius: var(--radius-sm);
+    font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.88rem;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .btn-export:hover { background: var(--accent); color: white; }
+  .btn-export.pdf { border-color: var(--primary); color: var(--primary); }
+  .btn-export.pdf:hover { background: var(--primary); color: white; }
+
+  /* ── Données brutes ── */
+  .table-wrap { background: white; border-radius: var(--radius); box-shadow: var(--ombre); overflow: hidden; }
+  .table-head { padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--gris); }
+  .table-head h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; }
+  .btn-danger {
+    padding: 8px 14px; background: white; border: 2px solid var(--danger);
+    color: var(--danger); border-radius: var(--radius-sm);
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.82rem;
+    cursor: pointer; transition: all .2s;
+  }
+  .btn-danger:hover { background: var(--danger); color: white; }
+  .tscroll { max-height: 440px; overflow-y: auto; }
+  .dtable { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .dtable th { background: var(--noir); color: white; padding: 10px 12px; text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: .4px; position: sticky; top: 0; }
+  .dtable td { padding: 9px 12px; border-bottom: 1px solid var(--gris); }
+  .dtable tr:hover td { background: #F1F5F9; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 100px; font-size: 0.72rem; font-weight: 800; }
+  .p-low  { background: #EFF6FF; color: #1E3A5F; }
+  .p-mid  { background: #FEF9C3; color: #713F12; }
+  .p-high { background: #FEF2F2; color: #7F1D1D; }
+
+  /* ── À propos ── */
+  .about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .about-card h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin-bottom: 12px; color: var(--accent); }
+  .about-card p, .about-card li { color: var(--muted); font-size: 0.88rem; line-height: 1.7; }
+  .about-card ul { padding-left: 16px; }
+  .about-card li { margin-bottom: 4px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+  .badge { padding: 5px 12px; border-radius: 100px; font-size: 0.75rem; font-weight: 800; }
+  .b1 { background: var(--pale); color: var(--primary); }
+  .b2 { background: #F0FDF4; color: #14532D; }
+  .b3 { background: #FEF9C3; color: #713F12; }
+
+  /* ── Toast & spinner ── */
+  #toast {
+    position: fixed; bottom: 28px; right: 28px;
+    padding: 13px 22px; border-radius: var(--radius-sm);
+    font-weight: 700; font-size: 0.9rem; color: white; z-index: 9999;
+    transform: translateY(80px); opacity: 0;
+    transition: all .35s cubic-bezier(.34,1.56,.64,1);
+    max-width: 360px;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.ok  { background: var(--primary); }
+  #toast.err { background: var(--danger); }
+
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.4); border-top-color: white; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty { text-align: center; padding: 56px 20px; color: var(--muted); }
+  .empty .eico { font-size: 3.5rem; margin-bottom: 14px; }
+
+  @media(max-width:768px){
+    main{padding:20px 14px;} .header-inner{padding:20px 14px;} nav{padding:0 6px;}
+    .form-grid,.charts-grid,.kpi-grid,.tests-grid,.about-grid,.corr-grid{grid-template-columns:1fr;}
+    .form-group.full,.chart-card.full,.btn-submit{grid-column:1;}
+    .live-badge{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar"></div>
+
+<header>
+  <div class="header-bg"></div>
+  <div class="header-inner">
+    <div class="logo">📊</div>
+    <div class="header-text">
+      <h1>Stat<span>Etud</span></h1>
+      <p>Collecte & Analyse Descriptive · Santé Étudiante · Université de Yaoundé I</p>
+      <p style="margin-top:5px;font-size:0.8rem;color:rgba(255,255,255,0.5);font-weight:700;letter-spacing:0.3px;">
+        👤 Mbodou Mahamat &nbsp;·&nbsp; Matricule : 21T2615
+      </p>
+    </div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      <span id="live-count">0 réponse(s)</span>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <button class="tab-btn active" onclick="goTab('collecte',this)">✍️ Collecte</button>
+  <button class="tab-btn" onclick="goTab('analyse',this)">📈 Analyse</button>
+  <button class="tab-btn" onclick="goTab('avancee',this)">🔬 Stats Avancées</button>
+  <button class="tab-btn" onclick="goTab('donnees',this)">🗄️ Données</button>
+  <button class="tab-btn" onclick="goTab('apropos',this)">ℹ️ À propos</button>
+</nav>
+
+<main>
+
+<!-- ══ COLLECTE ══ -->
+<section id="collecte" class="section active">
+  <div class="section-header">
+    <h2>Formulaire de <span class="acc">Collecte</span></h2>
+    <p>Questionnaire anonyme sur votre santé et bien-être académique.</p>
+  </div>
+  <div class="card">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Prénom anonymisé <span class="req">*</span></label>
+        <input type="text" id="nom" placeholder="Ex: Étudiant_042" maxlength="40">
+      </div>
+      <div class="form-group">
+        <label>Âge <span class="req">*</span></label>
+        <input type="number" id="age" placeholder="Ex: 21" min="15" max="50">
+      </div>
+      <div class="form-group">
+        <label>Niveau <span class="req">*</span></label>
+        <select id="niveau">
+          <option value="">— Sélectionner —</option>
+          <option>L1</option><option selected>L2</option><option>L3</option>
+          <option>Master 1</option><option>Master 2</option><option>Doctorat</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Filière <span class="req">*</span></label>
+        <select id="filiere">
+          <option value="">— Sélectionner —</option>
+          <option>Informatique</option><option>Mathématiques</option><option>Physique</option>
+          <option>Chimie</option><option>Biologie</option><option>Sciences de la Terre</option><option>Autre</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>Niveau de stress (1 = très faible · 5 = très élevé) <span class="req">*</span></label>
+        <div class="stress-val" id="stress-disp">3</div>
+        <input type="range" id="stress" class="stress-slider" min="1" max="5" value="3"
+          oninput="document.getElementById('stress-disp').textContent=this.value">
+        <div class="stress-labels"><span>😌 Calme</span><span>😐 Modéré</span><span>😰 Stressé</span></div>
+      </div>
+      <div class="form-group">
+        <label>Heures de sommeil/nuit <span class="req">*</span></label>
+        <input type="number" id="sommeil" placeholder="Ex: 7" min="1" max="16" step="0.5">
+      </div>
+      <div class="form-group">
+        <label>Repas par jour <span class="req">*</span></label>
+        <input type="number" id="repas_par_jour" placeholder="Ex: 2" min="1" max="6">
+      </div>
+      <div class="form-group">
+        <label>Heures d'étude/jour <span class="req">*</span></label>
+        <input type="number" id="heures_etude" placeholder="Ex: 4" min="0" max="20" step="0.5">
+      </div>
+      <div class="form-group">
+        <label>Activité physique <span class="req">*</span></label>
+        <select id="activite_physique">
+          <option value="">— Sélectionner —</option>
+          <option>Jamais</option><option>Rarement (1x/mois)</option>
+          <option>Parfois (1x/semaine)</option><option>Régulièrement (3x/semaine)</option>
+          <option>Quotidiennement</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Moyenne estimée (/20) <span class="req">*</span></label>
+        <input type="number" id="moyenne_estimee" placeholder="Ex: 13" min="0" max="20" step="0.5">
+      </div>
+      <button class="btn-submit" id="btn-sub" onclick="submitForm()">
+        <span id="btn-txt">📤 Soumettre mes données</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ══ ANALYSE DESCRIPTIVE ══ -->
+<section id="analyse" class="section">
+  <div class="section-header">
+    <h2>Analyse <span class="acc">Descriptive</span></h2>
+    <p>Statistiques calculées sur l'ensemble des réponses collectées.</p>
+  </div>
+  <div id="analyse-content"><div class="empty"><div class="eico">🔍</div><p>Chargement…</p></div></div>
+</section>
+
+<!-- ══ STATS AVANCÉES ══ -->
+<section id="avancee" class="section">
+  <div class="section-header">
+    <h2>Statistiques <span class="acc">Avancées</span></h2>
+    <p>Corrélations, régressions linéaires, tests statistiques, boîtes à moustaches.</p>
+  </div>
+  <div id="avancee-content"><div class="empty"><div class="eico">🔬</div><p>Chargement…</p></div></div>
+</section>
+
+<!-- ══ DONNÉES BRUTES ══ -->
+<section id="donnees" class="section">
+  <div class="section-header">
+    <h2>Données <span class="acc">Brutes</span></h2>
+    <p>Toutes les réponses enregistrées dans la base de données SQLite.</p>
+  </div>
+  <div class="export-bar">
+    <button class="btn-export" onclick="exportCSV()">📥 Exporter CSV</button>
+    <button class="btn-export pdf" onclick="exportPDF()">🖨️ Rapport PDF</button>
+  </div>
+  <div id="donnees-content"><div class="empty"><div class="eico">🗄️</div><p>Chargement…</p></div></div>
+</section>
+
+<!-- ══ À PROPOS ══ -->
+<section id="apropos" class="section">
+  <div class="section-header">
+    <h2>À <span class="acc">Propos</span></h2>
+  </div>
+  <div class="about-grid">
+    <div class="card about-card">
+      <h3>🎯 Objectif du projet</h3>
+      <p>StatEtud est une application de <strong>collecte et d'analyse descriptive avancée</strong> développée en L2 Informatique à l'Université de Yaoundé I.</p>
+      <br><p>Secteur ciblé : <strong>santé et bien-être étudiant</strong> — stress, sommeil, alimentation, activité physique et performance académique.</p>
+    </div>
+    <div class="card about-card">
+      <h3>📐 Statistiques couvertes</h3>
+      <ul>
+        <li>Moyenne, Médiane, Mode, Asymétrie</li>
+        <li>Écart-type (σ), Variance (σ²), CV%</li>
+        <li>Q1, Q3, IQR, Boîtes à moustaches</li>
+        <li>Corrélation de Pearson (matrice)</li>
+        <li>Régression linéaire (OLS) + R²</li>
+        <li>Test t de Student (une population)</li>
+        <li>Test du Chi² d'indépendance</li>
+      </ul>
+    </div>
+    <div class="card about-card">
+      <h3>⚙️ Technologies</h3>
+      <div class="badges">
+        <span class="badge b3">HTML5</span><span class="badge b3">CSS3</span>
+        <span class="badge b3">JavaScript</span><span class="badge b2">Python 3</span>
+        <span class="badge b2">Flask</span><span class="badge b2">SQLite</span>
+        <span class="badge b1">WebSockets</span><span class="badge b1">Socket.IO</span>
+        <span class="badge b1">Chart.js 4</span>
+      </div>
+    </div>
+    <div class="card about-card">
+      <h3>🏗️ Architecture Expert</h3>
+      <ul>
+        <li><strong>Base de données :</strong> SQLite (persistant, robuste)</li>
+        <li><strong>Sécurité :</strong> Validation serveur + sanitisation XSS</li>
+        <li><strong>Rate limiting :</strong> 10 req/min par IP</li>
+        <li><strong>Temps réel :</strong> WebSockets (Socket.IO)</li>
+        <li><strong>Export :</strong> CSV + Rapport HTML/PDF</li>
+        <li><strong>Stats :</strong> Module Python natif (pas de NumPy)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</main>
+<div id="toast"></div>
+
+<script>
+const API = 'http://localhost:5000/api';
+let charts = {};
+
+// ── WebSocket temps réel ──────────────────────────────────────
+const socket = io('http://localhost:5000');
+socket.on('new_response', data => {
+  document.getElementById('live-count').textContent = `${data.total} réponse(s)`;
+  // Rafraîchir automatiquement si on est sur Analyse ou Avancée
+  const active = document.querySelector('.section.active').id;
+  if (active === 'analyse') loadAnalyse();
+  if (active === 'avancee') loadAvancee();
+  if (active === 'donnees') loadDonnees();
+});
+
+// ── Navigation ────────────────────────────────────────────────
+function goTab(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'analyse') loadAnalyse();
+  if (id === 'avancee') loadAvancee();
+  if (id === 'donnees') loadDonnees();
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `show ${type}`;
+  setTimeout(() => t.classList.remove('show'), 3800);
+}
+
+// ── Validation formulaire ─────────────────────────────────────
+function validate() {
+  const ids = ['nom','age','niveau','filiere','sommeil','repas_par_jour','heures_etude','activite_physique','moyenne_estimee'];
+  let ok = true;
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('err');
+    if (!el.value || el.value === '') { el.classList.add('err'); ok = false; }
+  });
+  return ok;
+}
+
+// ── Soumettre ─────────────────────────────────────────────────
+async function submitForm() {
+  if (!validate()) { toast('⚠️ Remplissez tous les champs obligatoires.','err'); return; }
+  const btn = document.getElementById('btn-sub');
+  const txt = document.getElementById('btn-txt');
+  btn.disabled = true;
+  txt.innerHTML = '<span class="spinner"></span> Envoi…';
+  const payload = {
+    nom: document.getElementById('nom').value.trim(),
+    age: parseFloat(document.getElementById('age').value),
+    niveau: document.getElementById('niveau').value,
+    filiere: document.getElementById('filiere').value,
+    stress: parseInt(document.getElementById('stress').value),
+    sommeil: parseFloat(document.getElementById('sommeil').value),
+    repas_par_jour: parseInt(document.getElementById('repas_par_jour').value),
+    heures_etude: parseFloat(document.getElementById('heures_etude').value),
+    activite_physique: document.getElementById('activite_physique').value,
+    moyenne_estimee: parseFloat(document.getElementById('moyenne_estimee').value)
+  };
+  try {
+    const res = await fetch(`${API}/submit`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) { toast(`✅ ${data.message} (${data.total} total)`,'ok'); resetForm(); }
+    else toast(`❌ ${data.error}`,'err');
+  } catch(e) {
+    toast('❌ Serveur inaccessible. Lancez python3 app.py','err');
+  }
+  btn.disabled = false; txt.innerHTML = '📤 Soumettre mes données';
+}
+
+function resetForm() {
+  ['nom','age','sommeil','repas_par_jour','heures_etude','moyenne_estimee'].forEach(id => document.getElementById(id).value='');
+  ['niveau','filiere','activite_physique'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('stress').value=3;
+  document.getElementById('stress-disp').textContent='3';
+}
+
+// ── ANALYSE DESCRIPTIVE ───────────────────────────────────────
+async function loadAnalyse() {
+  const box = document.getElementById('analyse-content');
+  try {
+    const res = await fetch(`${API}/stats`);
+    if (res.status===404) { box.innerHTML=`<div class="empty"><div class="eico">📭</div><p>Aucune donnée. Commencez par remplir le formulaire.</p></div>`; return; }
+    const s = await res.json();
+    renderAnalyse(box, s);
+  } catch(e) {
+    box.innerHTML=`<div class="empty"><div class="eico">⚠️</div><p>Serveur Flask inaccessible.</p></div>`;
+  }
+}
+
+function renderAnalyse(box, s) {
+  const n = s.numeriques; const c = s.categoriques; const d = s.distributions;
+  const vl = {age:'Âge (ans)',stress:'Stress (1-5)',sommeil:'Sommeil (h)',repas_par_jour:'Repas/jour',heures_etude:'Étude (h/j)',moyenne_estimee:'Moyenne /20'};
+
+  let rows = '';
+  for (const [k,label] of Object.entries(vl)) {
+    const v = n[k]; if (!v || !v.n) continue;
+    rows += `<tr>
+      <td class="var-name">${label}</td><td>${v.n}</td>
+      <td class="hl">${v.mean}</td><td>${v.median}</td><td>${v.mode}</td>
+      <td>${v.std}</td><td>${v.variance}</td><td>${v.min}</td><td>${v.max}</td>
+      <td>${v.q1}</td><td>${v.q3}</td><td>${v.iqr}</td>
+      <td>${v.cv}%</td><td>${v.skewness}</td>
+    </tr>`;
+  }
+
+  box.innerHTML = `
+  <div class="kpi-grid">
+    <div class="kpi"><div class="ico">👥</div><div class="val">${s.total}</div><div class="lbl">Répondants</div></div>
+    <div class="kpi"><div class="ico">😰</div><div class="val">${n.stress.mean||'–'}<small style="font-size:.9rem">/5</small></div><div class="lbl">Stress moyen</div></div>
+    <div class="kpi"><div class="ico">😴</div><div class="val">${n.sommeil.mean||'–'}<small style="font-size:.9rem">h</small></div><div class="lbl">Sommeil moyen</div></div>
+    <div class="kpi"><div class="ico">📝</div><div class="val">${n.moyenne_estimee.mean||'–'}<small style="font-size:.9rem">/20</small></div><div class="lbl">Moyenne moy.</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px;overflow-x:auto">
+    <h3 style="font-family:'Playfair Display',serif;margin-bottom:16px">Statistiques descriptives complètes</h3>
+    <table class="stats-table">
+      <thead><tr>
+        <th>Variable</th><th>N</th><th>Moyenne</th><th>Médiane</th><th>Mode</th>
+        <th>σ</th><th>σ²</th><th>Min</th><th>Max</th>
+        <th>Q1</th><th>Q3</th><th>IQR</th><th>CV%</th><th>Asymétrie</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card"><h3>Distribution du Stress</h3><canvas id="c-stress"></canvas></div>
+    <div class="chart-card"><h3>Répartition par Niveau</h3><canvas id="c-niveau"></canvas></div>
+    <div class="chart-card"><h3>Distribution du Sommeil</h3><canvas id="c-sommeil"></canvas></div>
+    <div class="chart-card"><h3>Activité Physique</h3><canvas id="c-activite"></canvas></div>
+    <div class="chart-card full"><h3>Étudiants par Filière</h3><canvas id="c-filiere"></canvas></div>
+  </div>`;
+
+  Object.values(charts).forEach(c => c.destroy()); charts = {};
+  const pal = ['#1E3A5F','#2A5298','#3A6EBF','#5A8FD6','#7CA9E0','#94A3B8','#CBD5E1'];
+
+  charts.stress = new Chart(document.getElementById('c-stress'), {
+    type:'bar', data:{labels:['1 😌','2','3 😐','4','5 😰'],
+    datasets:[{label:'Étudiants',data:[1,2,3,4,5].map(i=>d.stress[String(i)]||0),
+      backgroundColor:pal,borderRadius:7}]},
+    options:{responsive:true,plugins:{legend:{display:false}}}
+  });
+
+  const nlabs=Object.keys(c.niveaux);
+  charts.niveau = new Chart(document.getElementById('c-niveau'), {
+    type:'doughnut', data:{labels:nlabs,datasets:[{data:Object.values(c.niveaux),
+      backgroundColor:pal.slice(0,nlabs.length),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,plugins:{legend:{position:'right'}}}
+  });
+
+  const bins=[0,0,0,0,0];
+  d.sommeil.forEach(v=>{if(v<5)bins[0]++;else if(v<6)bins[1]++;else if(v<7)bins[2]++;else if(v<8)bins[3]++;else bins[4]++;});
+  charts.sommeil = new Chart(document.getElementById('c-sommeil'), {
+    type:'bar', data:{labels:['<5h','5-6h','6-7h','7-8h','8h+'],
+    datasets:[{label:'Étudiants',data:bins,backgroundColor:'#3A6EBF',borderRadius:7}]},
+    options:{responsive:true,plugins:{legend:{display:false}}}
+  });
+
+  const alabs=Object.keys(c.activite_physique);
+  charts.activite = new Chart(document.getElementById('c-activite'), {
+    type:'pie', data:{labels:alabs,datasets:[{data:Object.values(c.activite_physique),
+      backgroundColor:pal.slice(0,alabs.length),borderColor:'#fff',borderWidth:2}]},
+    options:{responsive:true,plugins:{legend:{position:'bottom',labels:{boxWidth:11}}}}
+  });
+
+  const flabs=Object.keys(c.filieres);
+  charts.filiere = new Chart(document.getElementById('c-filiere'), {
+    type:'bar', data:{labels:flabs,datasets:[{label:'Étudiants',
+      data:Object.values(c.filieres),backgroundColor:'rgba(58,110,191,0.75)',borderRadius:7}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1}}}}
+  });
+}
+
+// ── STATS AVANCÉES ────────────────────────────────────────────
+async function loadAvancee() {
+  const box = document.getElementById('avancee-content');
+  try {
+    const res = await fetch(`${API}/stats`);
+    if (res.status===404) { box.innerHTML=`<div class="empty"><div class="eico">📭</div><p>Aucune donnée disponible.</p></div>`; return; }
+    const s = await res.json();
+    renderAvancee(box, s);
+  } catch(e) {
+    box.innerHTML=`<div class="empty"><div class="eico">⚠️</div><p>Serveur inaccessible.</p></div>`;
+  }
+}
+
+function corrClass(r) {
+  if (r===null||r===undefined) return 'c-weak';
+  const a=Math.abs(r);
+  if (a>=0.7) return r>0?'c-strong-pos':'c-neg';
+  if (a>=0.4) return r>0?'c-mod-pos':'c-neg';
+  return 'c-weak';
+}
+function corrLabel(r) {
+  if (r===null||r===undefined) return 'N/D';
+  const a=Math.abs(r);
+  if (a>=0.7) return r>0?'Forte +':'Forte −';
+  if (a>=0.4) return r>0?'Modérée +':'Modérée −';
+  return 'Faible';
+}
+
+const VAR_NAMES = {
+  stress:'Stress',sommeil:'Sommeil',heures_etude:'Étude',
+  repas_par_jour:'Repas',moyenne_estimee:'Moyenne',age:'Âge'
+};
+
+function renderAvancee(box, s) {
+  // Corrélations
+  let corrCards = '';
+  for (const [key, r] of Object.entries(s.correlations||{})) {
+    const [k1,k2] = key.split('|');
+    corrCards += `<div class="corr-card ${corrClass(r)}">
+      <div class="corr-val">${r!==null?r:'N/D'}</div>
+      <div class="corr-lbl">${VAR_NAMES[k1]||k1} ↔ ${VAR_NAMES[k2]||k2}</div>
+      <div class="corr-interp">${corrLabel(r)}</div>
+    </div>`;
+  }
+
+  // Régressions
+  const regs = s.regressions || {};
+  function regBlock(reg, title) {
+    if (!reg) return `<div style="color:var(--muted);font-size:.85rem;padding:10px">Données insuffisantes (min. 3)</div>`;
+    const sig = reg.r2 >= 0.3 ? 'sig' : 'nosig';
+    const sigTxt = reg.r2 >= 0.3 ? 'R² significatif — relation réelle' : 'R² faible — relation peu marquée';
+    return `
+      <div class="test-row"><span class="test-key">Équation</span><span class="test-val">y = ${reg.b0} + ${reg.b1}×x</span></div>
+      <div class="test-row"><span class="test-key">R² (coeff. déterm.)</span><span class="test-val">${reg.r2}</span></div>
+      <div class="test-row"><span class="test-key">r (Pearson)</span><span class="test-val">${reg.r}</span></div>
+      <div class="verdict ${sig}">${sigTxt}</div>`;
+  }
+
+  // Tests statistiques
+  const tt = s.tests?.t_test_moyenne;
+  const ch = s.tests?.chi2_stress_filiere;
+
+  function ttBlock() {
+    if (!tt) return `<div style="color:var(--muted);font-size:.85rem;padding:10px">Données insuffisantes</div>`;
+    const sig = Math.abs(tt.t_stat)>2?'sig':'nosig';
+    return `
+      <div class="test-row"><span class="test-key">H₀ (hypothèse nulle)</span><span class="test-val">μ = ${tt.mu0}/20</span></div>
+      <div class="test-row"><span class="test-key">Moyenne observée</span><span class="test-val">${tt.mean}</span></div>
+      <div class="test-row"><span class="test-key">Écart-type</span><span class="test-val">${tt.std}</span></div>
+      <div class="test-row"><span class="test-key">t statistique</span><span class="test-val">${tt.t_stat}</span></div>
+      <div class="test-row"><span class="test-key">N</span><span class="test-val">${tt.n}</span></div>
+      <div class="verdict ${sig}">${tt.interpretation}</div>`;
+  }
+
+  function chi2Block() {
+    if (!ch) return `<div style="color:var(--muted);font-size:.85rem;padding:10px">Données insuffisantes</div>`;
+    const sig = ch.chi2>3.84?'sig':'nosig';
+    return `
+      <div class="test-row"><span class="test-key">Variables</span><span class="test-val">Stress ↔ Filière</span></div>
+      <div class="test-row"><span class="test-key">χ² calculé</span><span class="test-val">${ch.chi2}</span></div>
+      <div class="test-row"><span class="test-key">Degrés de liberté</span><span class="test-val">${ch.ddl}</span></div>
+      <div class="test-row"><span class="test-key">Seuil critique</span><span class="test-val">3.84 (α=5%)</span></div>
+      <div class="verdict ${sig}">${ch.interpretation}</div>`;
+  }
+
+  box.innerHTML = `
+  <div class="card" style="margin-bottom:24px">
+    <h3 style="font-family:'Playfair Display',serif;margin-bottom:16px">Matrice de Corrélations de Pearson</h3>
+    <p style="color:var(--muted);font-size:.83rem;margin-bottom:16px">Valeurs de r entre -1 et 1. |r|≥0.7 = forte, |r|≥0.4 = modérée, |r|<0.4 = faible.</p>
+    <div class="corr-grid">${corrCards||'<p style="color:var(--muted)">Insuffisamment de données.</p>'}</div>
+  </div>
+
+  <div class="charts-grid" style="margin-bottom:24px">
+    <div class="chart-card"><h3>Régression : Étude → Moyenne</h3><canvas id="c-reg1"></canvas></div>
+    <div class="chart-card"><h3>Régression : Stress → Moyenne</h3><canvas id="c-reg2"></canvas></div>
+    <div class="chart-card full"><h3>Boîtes à Moustaches (Boxplots)</h3><canvas id="c-box"></canvas></div>
+  </div>
+
+  <div class="tests-grid">
+    <div class="test-card"><h3>Test t de Student — Moyenne académique</h3>${ttBlock()}</div>
+    <div class="test-card"><h3>Test Chi² — Stress vs Filière</h3>${chi2Block()}</div>
+    <div class="test-card"><h3>Régression : Étude → Moyenne</h3>${regBlock(regs.etude_vs_moyenne,'')}</div>
+    <div class="test-card"><h3>Régression : Stress → Moyenne</h3>${regBlock(regs.stress_vs_moyenne,'')}</div>
+  </div>`;
+
+  // Scatter + droite de régression — Étude vs Moyenne
+  function drawReg(canvasId, reg, xLabel, yLabel) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx || !reg) return;
+    if (charts[canvasId]) charts[canvasId].destroy();
+    charts[canvasId] = new Chart(ctx, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          { label: 'Observations', data: reg.x_vals.map((x,i)=>({x,y:reg.y_vals[i]})),
+            backgroundColor: 'rgba(58,110,191,0.55)', pointRadius: 6 },
+          { label: `Droite de régression (R²=${reg.r2})`,
+            data: reg.x_vals.map((x,i)=>({x,y:reg.y_pred[i]})),
+            type:'line', borderColor:'#1E3A5F', borderWidth:2,
+            pointRadius:0, fill:false }
+        ]
+      },
+      options: { responsive:true, plugins:{legend:{position:'bottom'}},
+        scales:{x:{title:{display:true,text:xLabel}},y:{title:{display:true,text:yLabel}}} }
+    });
+  }
+  drawReg('c-reg1', regs.etude_vs_moyenne, "Heures d'étude", 'Moyenne /20');
+  drawReg('c-reg2', regs.stress_vs_moyenne, 'Stress (1-5)', 'Moyenne /20');
+
+  // Boxplots (barres min/Q1/med/Q3/max)
+  const bx = s.boxplots || {};
+  const bxKeys = ['moyenne_estimee','stress','sommeil','heures_etude'];
+  const bxLabels = bxKeys.map(k=>VAR_NAMES[k]||k);
+  const bxData = bxKeys.map(k => bx[k] ? [bx[k].whisker_low, bx[k].q1, bx[k].median, bx[k].q3, bx[k].whisker_high] : [0,0,0,0,0]);
+
+  const boxCtx = document.getElementById('c-box');
+  if (boxCtx) {
+    if (charts['c-box']) charts['c-box'].destroy();
+    charts['c-box'] = new Chart(boxCtx, {
+      type: 'bar',
+      data: {
+        labels: bxLabels,
+        datasets: [
+          { label: 'Min (moustache basse)', data: bxData.map(d=>d[0]), backgroundColor:'rgba(30,58,95,0.15)', borderRadius:3 },
+          { label: 'Q1', data: bxData.map(d=>d[1]-d[0]), backgroundColor:'rgba(58,110,191,0.35)', borderRadius:3 },
+          { label: 'Médiane', data: bxData.map(d=>d[2]-d[1]), backgroundColor:'rgba(58,110,191,0.75)', borderRadius:3 },
+          { label: 'Q3', data: bxData.map(d=>d[3]-d[2]), backgroundColor:'rgba(58,110,191,0.35)', borderRadius:3 },
+          { label: 'Max (moustache haute)', data: bxData.map(d=>d[4]-d[3]), backgroundColor:'rgba(30,58,95,0.15)', borderRadius:3 }
+        ]
+      },
+      options: { responsive:true, plugins:{legend:{position:'bottom'}},
+        scales:{ x:{stacked:true}, y:{stacked:true,beginAtZero:true} } }
+    });
+  }
+}
+
+// ── DONNÉES BRUTES ────────────────────────────────────────────
+async function loadDonnees() {
+  const box = document.getElementById('donnees-content');
+  try {
+    const res = await fetch(`${API}/data`);
+    const data = await res.json();
+    if (!data.length) {
+      box.innerHTML=`<div class="empty"><div class="eico">📭</div><p>Aucune donnée collectée.</p></div>`; return;
+    }
+    const rows = data.map(d=>`<tr>
+      <td><strong>${d.id}</strong></td><td>${d.nom}</td><td>${d.age}</td>
+      <td>${d.niveau}</td><td>${d.filiere}</td>
+      <td>${d.stress<=2?`<span class="pill p-low">😌 ${d.stress}/5</span>`:d.stress===3?`<span class="pill p-mid">😐 ${d.stress}/5</span>`:`<span class="pill p-high">😰 ${d.stress}/5</span>`}</td>
+      <td>${d.sommeil}h</td><td>${d.repas_par_jour}</td><td>${d.heures_etude}h</td>
+      <td>${d.activite_physique}</td>
+      <td><strong>${d.moyenne_estimee}/20</strong></td>
+      <td style="font-size:.73rem;color:#94A3B8">${new Date(d.timestamp).toLocaleString('fr-FR')}</td>
+    </tr>`).join('');
+    box.innerHTML=`<div class="table-wrap">
+      <div class="table-head">
+        <h3>📋 ${data.length} réponse(s)</h3>
+        <button class="btn-danger" onclick="resetData()">🗑️ Vider</button>
+      </div>
+      <div class="tscroll"><table class="dtable">
+        <thead><tr><th>#</th><th>Prénom</th><th>Âge</th><th>Niveau</th><th>Filière</th>
+        <th>Stress</th><th>Sommeil</th><th>Repas</th><th>Étude</th>
+        <th>Activité</th><th>Moyenne</th><th>Date</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+  } catch(e) {
+    box.innerHTML=`<div class="empty"><div class="eico">⚠️</div><p>Serveur inaccessible.</p></div>`;
+  }
+}
+
+// ── Export CSV ────────────────────────────────────────────────
+function exportCSV() {
+  window.location.href = `${API}/export/csv`;
+}
+
+// ── Export PDF ────────────────────────────────────────────────
+function exportPDF() {
+  window.open(`${API}/export/pdf`, '_blank');
+}
+
+// ── Reset données ─────────────────────────────────────────────
+async function resetData() {
+  if (!confirm('⚠️ Vider toutes les données ? Action irréversible.')) return;
+  try {
+    await fetch(`${API}/reset`, {method:'DELETE'});
+    toast('🗑️ Données réinitialisées.','ok');
+    loadDonnees();
+  } catch(e) { toast('❌ Erreur serveur.','err'); }
+}
+</script>
+</body>
+</html>
