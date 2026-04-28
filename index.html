@@ -480,11 +480,12 @@
 <div id="toast"></div>
 
 <script>
-const API = 'http://localhost:5000/api';
+const BASE = window.location.origin;
+const API = `${BASE}/api`;
 let charts = {};
 
 // ── WebSocket temps réel ──────────────────────────────────────
-const socket = io('http://localhost:5000');
+const socket = io(BASE);
 socket.on('new_response', data => {
   document.getElementById('live-count').textContent = `${data.total} réponse(s)`;
   // Rafraîchir automatiquement si on est sur Analyse ou Avancée

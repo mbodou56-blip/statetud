@@ -560,7 +560,7 @@ def export_pdf():
   <div class="btn-bar" style="margin-top:28px">
     <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer / Sauvegarder en PDF</button>
     <button class="btn btn-outline" onclick="window.close()">✖ Fermer cet onglet</button>
-    <a class="btn btn-blue" href="http://localhost:5000">⬅ Retour à l'application</a>
+    <a class="btn btn-blue" href="/">⬅ Retour à l'application</a>
   </div>
 
   <!-- ── Résumé exécutif ── -->
@@ -683,7 +683,7 @@ def export_pdf():
   <div class="btn-bar" style="margin-top:28px">
     <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer / Sauvegarder en PDF</button>
     <button class="btn btn-outline" onclick="window.close()">✖ Fermer cet onglet</button>
-    <a class="btn btn-blue" href="http://localhost:5000">⬅ Retour à l'application</a>
+    <a class="btn btn-blue" href="/">⬅ Retour à l'application</a>
   </div>
 
 </div><!-- /content -->
